@@ -10,13 +10,15 @@ The solution consists of a single Next.js application with two distinct function
 ## 2. Architecture Overview
 
 ### 2.1 High-Level Stack
-*   **Frontend:** Next.js 14+ (App Router), React, TypeScript.
+*   **Frontend:** Next.js 15.5, React 19.2, TypeScript.
 *   **UI Framework:** Tailwind CSS, shadcn/ui (specifically `sidebar-11` layout).
-*   **State Management:** React Query (TanStack Query) for caching S3 listings.
-*   **Upload Engine:** Uppy.io (Client-side orchestration for multi-file uploads).
+*   **State Management:** TanStack Query v5 (formerly React Query) for caching S3 listings.
+*   **Upload Engine:** Uppy.io v5 (Client-side orchestration for multi-file uploads).
 *   **Backend:** Next.js Server Actions / API Routes.
-*   **Storage:** AWS S3 (or S3-compatible on-prem storage).
-*   **Infrastructure:** Ubuntu VM (provisioned via VMware Aria Automation), Docker Container, Caddy Reverse Proxy.
+*   **Storage (Production):** VMware Aria Automation S3 (S3-compatible on-prem storage).
+*   **Storage (Development):** MinIO (S3-compatible local testing).
+*   **Infrastructure (Production):** Ubuntu VM (provisioned via VMware Aria Automation), Docker Container, Caddy Reverse Proxy.
+*   **Infrastructure (Development):** Docker Compose on developer machines.
 
 ### 2.2 Data Flow
 1.  **User** drags files from OS File Explorer (Network Share) $\rightarrow$ **Browser**.
@@ -67,8 +69,9 @@ The solution consists of a single Next.js application with two distinct function
 | `GET` | `/api/s3/preview` | Query params: `key`. Streams the first $N$ bytes of a file to parse CSV head. |
 
 ### 4.2 Dependencies & Libraries
-*   `aws-sdk/client-s3`: For all bucket interactions.
-*   `@uppy/core`, `@uppy/react`, `@uppy/aws-s3`: For the upload engine.
+*   `@aws-sdk/client-s3` (v3): For all bucket interactions (works with both VMware Aria S3 and MinIO).
+*   `@uppy/core`, `@uppy/react`, `@uppy/aws-s3` (v5): For the upload engine.
+*   `@tanstack/react-query` (v5): For server state management and caching.
 *   `papaparse`: For parsing the CSV preview on the client side.
 *   `lucide-react`: Icons for file types and UI elements.
 *   `zod`: For API input validation.
@@ -105,13 +108,119 @@ Caddy will serve as the entry point, handling SSL termination and forwarding to 
 ```text
 csv-manager.corp.local {
     reverse_proxy localhost:3000
-    
+
     # Optional: Increase timeouts for long-running API calls (though uploads bypass this)
     transport http {
         read_timeout 300s
     }
 }
 ```
+
+### 5.4 Development Environment with MinIO
+
+For local development and testing, we use **MinIO** as an S3-compatible alternative to VMware Aria Automation S3. This allows developers to test the full application stack on their local machines without requiring access to production infrastructure.
+
+#### Why MinIO?
+*   **S3 API Compatible:** Uses the exact same AWS SDK (`@aws-sdk/client-s3`) with zero code changes.
+*   **Lightweight:** Runs easily in Docker Compose alongside the Next.js application.
+*   **Free & Open Source:** No licensing costs for development/testing.
+*   **Easy Translation:** Same bucket operations, credentials pattern, and API calls as production.
+
+#### Docker Compose Configuration
+
+```yaml
+# Conceptual docker-compose.yml
+version: '3.8'
+
+services:
+  # MinIO S3-compatible storage
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Next.js Application
+  app:
+    build: .
+    container_name: csv-ingest-app
+    ports:
+      - "3000:3000"
+    environment:
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET_NAME: csv-ingest
+      S3_FORCE_PATH_STYLE: "true"  # Required for MinIO
+    depends_on:
+      - minio
+
+volumes:
+  minio_data:
+```
+
+#### Environment Variables: Development vs Production
+
+| Variable | Development (MinIO) | Production (VMware Aria S3) |
+| :--- | :--- | :--- |
+| `AWS_ENDPOINT_URL` | `http://minio:9000` or `http://localhost:9000` | `https://s3.corp.local` (your endpoint) |
+| `AWS_ACCESS_KEY_ID` | `minioadmin` (or custom) | Corporate IAM Access Key |
+| `AWS_SECRET_ACCESS_KEY` | `minioadmin` (or custom) | Corporate IAM Secret Key |
+| `AWS_REGION` | `us-east-1` (any valid region) | Your on-prem region or `us-east-1` |
+| `S3_BUCKET_NAME` | `csv-ingest` | Production bucket name |
+| `S3_FORCE_PATH_STYLE` | `true` (required for MinIO) | `false` (or omit) |
+
+#### First-Time Setup
+
+1.  **Start the stack:**
+    ```bash
+    docker-compose up -d
+    ```
+
+2.  **Access MinIO Console:**
+    *   URL: http://localhost:9001
+    *   Username: `minioadmin`
+    *   Password: `minioadmin`
+
+3.  **Create the bucket:**
+    *   Navigate to "Buckets" → "Create Bucket"
+    *   Bucket Name: `csv-ingest`
+    *   Region: `us-east-1`
+
+4.  **Configure CORS (if needed):**
+    *   Select the bucket → "Anonymous" → "Access Rules"
+    *   Add a rule to allow `PUT`, `POST`, `GET` from `http://localhost:3000`
+
+5.  **Access the application:**
+    *   URL: http://localhost:3000
+
+#### Development Workflow
+
+1.  **Code Changes:** Edit files locally (hot-reload enabled in dev mode).
+2.  **Test Uploads:** Drag files into the browser to test upload to MinIO.
+3.  **Verify Storage:** Check MinIO Console to see uploaded files.
+4.  **Test Manager:** Use the file explorer to rename, delete, and preview files.
+
+#### Translation to Production
+
+When deploying to production on VMware Aria Automation:
+*   **Same Application Code:** No changes needed to S3 client code.
+*   **Different Environment Variables:** Update `.env` or Docker secrets with production credentials.
+*   **No MinIO Container:** Application connects directly to VMware Aria S3 endpoint.
+*   **Same Bucket Operations:** All API calls (list, upload, copy, delete) work identically.
 
 ---
 
