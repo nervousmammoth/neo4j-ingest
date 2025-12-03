@@ -11,7 +11,7 @@ This is an S3 CSV Ingest & Management Suite - a Next.js application that enables
 
 ## Tech Stack (Current Versions)
 
-- **Frontend**: Next.js 15.5, React 19.2, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 16.0.6, React 19.2, TypeScript, Tailwind CSS
 - **UI Framework**: shadcn/ui (specifically sidebar-11 layout)
 - **State Management**: TanStack Query v5 (formerly React Query) for caching S3 listings
 - **Upload Engine**: Uppy.io v5 for multi-file uploads
