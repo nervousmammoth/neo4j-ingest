@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -14,20 +15,24 @@ import {
 } from "@/components/ui/sidebar"
 import { Upload, FolderTree, Settings } from "lucide-react"
 
-const navItems = [
+type Mode = "upload" | "browse"
+
+const navItems: { title: string; icon: typeof Upload; mode: Mode }[] = [
   {
     title: "Upload",
     icon: Upload,
-    isActive: true,
+    mode: "upload",
   },
   {
     title: "Browse",
     icon: FolderTree,
-    isActive: false,
+    mode: "browse",
   },
 ]
 
 export function AppSidebar() {
+  const [activeMode, setActiveMode] = useState<Mode>("upload")
+
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
@@ -40,7 +45,10 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton isActive={item.isActive}>
+                  <SidebarMenuButton
+                    isActive={item.mode === activeMode}
+                    onClick={() => setActiveMode(item.mode)}
+                  >
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
