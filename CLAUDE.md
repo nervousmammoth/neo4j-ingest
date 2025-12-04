@@ -9,25 +9,42 @@ This is an S3 CSV Ingest & Management Suite - a Next.js application that enables
 1. **Ingest Mode**: High-performance drag-and-drop interface for uploading files to S3
 2. **Manager Mode**: File-explorer interface to view, organize, rename, and preview uploaded data
 
-## Tech Stack (Current Versions)
+## Current Status
 
-- **Frontend**: Next.js 16.0.6, React 19.2, TypeScript, Tailwind CSS
-- **UI Framework**: shadcn/ui (specifically sidebar-11 layout)
-- **State Management**: TanStack Query v5 (formerly React Query) for caching S3 listings
-- **Upload Engine**: Uppy.io v5 for multi-file uploads
-- **Backend**: Next.js Server Actions / API Routes
-- **Storage (Production)**: VMware Aria Automation S3 via `@aws-sdk/client-s3` v3
-- **Storage (Development)**: MinIO (S3-compatible) via `@aws-sdk/client-s3` v3
+The project is in **Phase 1** (Project Skeleton & Infrastructure). See `issues/` for detailed task tracking.
+
+**Completed:**
+- P1.1: Next.js 16 project with TypeScript, Tailwind v4, standalone output
+- P1.2: shadcn/ui with sidebar-11 layout structure
+
+**Next:** P1.3 Docker Setup, then Phase 2 (S3 client, list endpoint, sidebar tree, file grid)
+
+## Tech Stack
+
+- **Frontend**: Next.js 16.0.6, React 19.2, TypeScript, Tailwind CSS v4
+- **UI Framework**: shadcn/ui (sidebar-11 layout)
+- **State Management**: TanStack Query v5 (planned)
+- **Upload Engine**: Uppy.io v5 (planned)
+- **Backend**: Next.js API Routes
+- **Storage**: MinIO (dev) / VMware Aria S3 (prod) via `@aws-sdk/client-s3` v3
 - **Infrastructure**: Docker Container with Caddy Reverse Proxy
 
-## Key Dependencies
+## Project Structure
 
-- `@aws-sdk/client-s3` - All S3 bucket interactions (v3 SDK)
-- `@uppy/core`, `@uppy/react`, `@uppy/aws-s3` - Upload engine (v5)
-- `papaparse` - CSV parsing for preview functionality
-- `lucide-react` - Icons
-- `zod` - API input validation
-- `@tanstack/react-query` - Server state management
+```
+src/
+├── app/                  # Next.js App Router
+│   ├── layout.tsx        # Root layout with SidebarProvider, dark mode
+│   ├── page.tsx          # Home page
+│   └── globals.css       # Tailwind imports
+├── components/
+│   ├── ui/               # shadcn/ui primitives (button, card, sidebar, etc.)
+│   └── app-sidebar.tsx   # Main sidebar with Upload/Browse modes
+├── hooks/
+│   └── use-mobile.ts     # Mobile detection hook
+└── lib/
+    └── utils.ts          # cn() utility for Tailwind class merging
+```
 
 ## Architecture
 
@@ -242,34 +259,33 @@ The project follows a phased implementation approach documented in `/issues/`:
 
 ## Common Commands
 
-### Local Development (Next.js only)
-- `npm run dev` - Start development server (requires MinIO running separately)
-- `npm run build` - Build for production
-- `npm run start` - Start production server
+### Development
+```bash
+npm run dev          # Start dev server at http://localhost:3000
+npm run build        # Build for production
+npm run start        # Start production server
+npm run lint         # Run ESLint
+```
+
+### Adding shadcn/ui Components
+```bash
+npx shadcn@latest add <component-name>
+```
 
 ### Docker Compose (Next.js + MinIO)
-- `docker-compose up -d` - Start all services in background
-- `docker-compose up` - Start all services with logs
-- `docker-compose down` - Stop all services
-- `docker-compose down -v` - Stop services and remove volumes (deletes MinIO data)
-- `docker-compose logs -f app` - Follow application logs
-- `docker-compose logs -f minio` - Follow MinIO logs
-- `docker-compose restart app` - Restart application only
+```bash
+docker-compose up -d          # Start all services
+docker-compose down           # Stop all services
+docker-compose down -v        # Stop and remove volumes
+docker-compose logs -f app    # Follow app logs
+```
 
 ### MinIO Management
 - **Web Console**: http://localhost:9001 (user: `minioadmin`, password: `minioadmin`)
-- **Create Bucket**: Use MinIO Console or AWS CLI:
+- **Create Bucket via CLI**:
   ```bash
   aws --endpoint-url http://localhost:9000 s3 mb s3://csv-ingest
   ```
-- **List Objects**:
-  ```bash
-  aws --endpoint-url http://localhost:9000 s3 ls s3://csv-ingest
-  ```
-
-### Docker Build
-- `docker build -t s3-csv-ingest .` - Build Docker image
-- `docker run -p 3000:3000 s3-csv-ingest` - Run container
 
 ## Deployment
 
@@ -295,12 +311,3 @@ csv-manager.corp.local {
 2. **React Query Caching**: Cache S3 listings aggressively with appropriate stale times
 3. **Upload Parallelization**: Uppy.io handles concurrent uploads - configure reasonable limits
 4. **Presigned URL Expiration**: Balance between security (short expiry) and UX (long enough for large uploads)
-
-## Sources
-
-- [Next.js 15.5 Release](https://nextjs.org/blog/next-15-5)
-- [React 19.2 Release](https://react.dev/blog/2025/10/01/react-19-2)
-- [Uppy 5.0 Announcement](https://uppy.io/blog/uppy-5.0/)
-- [AWS SDK for JavaScript v3](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/)
-- [TanStack Query](https://tanstack.com/query/latest)
-- [shadcn/ui](https://ui.shadcn.com/)
